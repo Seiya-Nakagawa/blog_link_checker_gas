@@ -1,0 +1,45 @@
+name: Deploy to Google Apps Script on merge
+
+# mainブランチにpushイベントがあった時にこのワークフローを実行する
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Create .clasprc.json
+        run: |
+          # （前回の回答と同じ認証情報の設定）
+          echo '{
+            "token": {
+              "access_token": "${{ secrets.ACCESS_TOKEN }}",
+              "refresh_token": "${{ secrets.REFRESH_TOKEN }}",
+              "scope": "https://www.googleapis.com/auth/script.projects https://www.googleapis.com/auth/script.deployments https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/script.webapp.deploy https://www.googleapis.com/auth/drive.file",
+              "token_type": "Bearer",
+              "expiry_date": 9999999999999,
+              "id_token": "${{ secrets.ID_TOKEN }}"
+            },
+            "oauth2ClientSettings": {
+              "clientId": "${{ secrets.CLIENT_ID }}",
+              "clientSecret": "${{ secrets.CLIENT_SECRET }}",
+              "redirectUri": "http://localhost"
+            },
+            "isLocalCreds": false
+          }' > ~/.clasprc.json
+
+      - name: Push to Apps Script
+        run: clasp push -f

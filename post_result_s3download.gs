@@ -4,6 +4,21 @@
  */
 
 // =============================================================================
+// --- グローバル設定 ---
+// =============================================================================
+// ※ CONFIGオブジェクトや定数は、実際の環境に合わせて設定してください。
+// const CONFIG = { ... };
+// const SHEET_NAME_TODAY = '...';
+// const SHEET_NAME_YESTERDAY = '...';
+// const S3_FLAG_FILE_KEY = '...';
+// const S3_RESULT_FILE_KEY = '...';
+// const RESULT_SHEET_COLUMN_COUNT = 8; // 例: A列からH列まで
+// const ADD_COLOR = '#D9EAD3';
+// const CHANGE_COLOR = '#FFF2CC';
+// const DELETE_COLOR = '#F4CCCC';
+
+
+// =============================================================================
 // --- メイン処理 ---
 // =============================================================================
 
@@ -210,7 +225,7 @@ function writeCsvToSpreadsheet_(sheet, csvText) {
  * @private
  */
 function compareAndHighlightDifferences_(sheetToday, sheetYesterday) {
-  const STATUS_CODE_COLUMN_INDEX = 3; // ステータスコード列 (D列)
+  const STATUS_CODE_COLUMN_INDEX = 3; // 確認結果列 (D列)
   const TIMESTAMP_COLUMN_INDEX = 7;   // タイムスタンプ列 (H列)
   const START_ROW = 2;
 
@@ -244,18 +259,21 @@ function compareAndHighlightDifferences_(sheetToday, sheetYesterday) {
       }
       if (isRowDifferent) {
         backgrounds[rowIndex].fill(CHANGE_COLOR);
-        results.changed.push({ pageUrl: todayRow[1], link: todayRow[2], statusCode: todayRow[STATUS_CODE_COLUMN_INDEX], details: changes.join('\n') });
+        // ★修正: キーを statusCode から checkResult に変更
+        results.changed.push({ pageUrl: todayRow[1], link: todayRow[2], checkResult: todayRow[STATUS_CODE_COLUMN_INDEX], details: changes.join('\n') });
       }
       yesterdayMap.delete(key);
     } else {
       backgrounds[rowIndex].fill(ADD_COLOR);
       fontColors[rowIndex].fill('red');
-      results.added.push({ pageUrl: todayRow[1], link: todayRow[2], statusCode: todayRow[STATUS_CODE_COLUMN_INDEX] });
+      // ★修正: キーを statusCode から checkResult に変更
+      results.added.push({ pageUrl: todayRow[1], link: todayRow[2], checkResult: todayRow[STATUS_CODE_COLUMN_INDEX] });
     }
   });
 
   yesterdayMap.forEach(deletedRow => {
-    results.deleted.push({ pageUrl: deletedRow[1], link: deletedRow[2], statusCode: deletedRow[STATUS_CODE_COLUMN_INDEX], data: deletedRow });
+    // ★修正: キーを statusCode から checkResult に変更
+    results.deleted.push({ pageUrl: deletedRow[1], link: deletedRow[2], checkResult: deletedRow[STATUS_CODE_COLUMN_INDEX], data: deletedRow });
   });
 
   if (todayValues.length > 0) {
@@ -279,9 +297,10 @@ function formatDiffEmailBody_(results) {
   if (results.added.length === 0 && results.changed.length === 0 && results.deleted.length === 0) {
     return "前回チェック時からの差分はありませんでした。";
   }
-  let body = "前回チェック時から以下の差分が検出されました。
-";
-  const formatItem = item => `  - ページ: ${item.pageUrl}\n    リンク: ${item.link}\n    ステータスコード: ${item.statusCode}`;
+  let body = "前回チェック時から以下の差分が検出されました。";
+
+  // ★修正: item.statusCode を item.checkResult に変更し、表示名は「確認結果」のままにする
+  const formatItem = item => `  - 記事URL: ${item.pageUrl}\n    広告URL: ${item.link}\n    確認結果: ${item.checkResult}`;
 
   if (results.added.length > 0) {
     body += `\n▼ 追加 (${results.added.length}件)\n`;
@@ -289,7 +308,8 @@ function formatDiffEmailBody_(results) {
   }
   if (results.changed.length > 0) {
     body += `\n\n▼ 変更 (${results.changed.length}件)\n`;
-    body += results.changed.map(item => `${formatItem(item)}\n${item.details}`).join('\n\n');
+    // ★修正: 共通情報と変更詳細の間に改行と「■変更」を挿入
+    body += results.changed.map(item => `${formatItem(item)}\n\n  ■ 変更内容\n${item.details}`).join('\n\n');
   }
   if (results.deleted.length > 0) {
     body += `\n\n▼ 削除 (${results.deleted.length}件)\n`;
